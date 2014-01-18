@@ -54,7 +54,7 @@ int main()
             // display first page of candidates
             py_get_candidates_by_pager(&p, candidate_pager_index, candidates);
             for (int i = 0; i < PY_CANDIDATE_PAGER_LEN; i++) {
-                if (candidates[i] == NULL) continue;
+                if (candidates[i] == NULL) break;
                 pinyin_get_candidate_string(p.instance,
                         candidates[i], &candidate_string);
                 printf("%d: %s\t", i, candidate_string);
@@ -72,6 +72,7 @@ int main()
                 int _offset = (int) (operation - '0');
                 if (_offset > PY_CANDIDATE_PAGER_LEN)
                     _offset = PY_CANDIDATE_PAGER_LEN - 1;
+
                 pinyin_get_candidate_string(p.instance,
                         candidates[_offset], &candidate_string);
                 pinyin_get_candidate_type(p.instance,
@@ -79,15 +80,22 @@ int main()
                 py_pinyin_offset = pinyin_choose_candidate(p.instance,
                         py_pinyin_offset, candidates[_offset]);
 
-                printf("select: %s\ttype: %s\toffset: %u\n",
+                pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
+                printf("select: %s\ttype: %s\toffset/len: %u/%u\n",
                         candidate_string,
                         candidate_type_name[candidate_type - 1],
-                        py_pinyin_offset);
-                if (candidate_type == BEST_MATCH_CANDIDATE
-                        && py_pinyin_offset == 0) goto NO_TRAIN;
+                        py_pinyin_offset,
+                        py_pinyin_len);
 
-                pinyin_guess_sentence_with_prefix(p.instance, candidate_string);
-                pinyin_guess_full_pinyin_candidates(p.instance, py_pinyin_offset);
+                if (candidate_type == BEST_MATCH_CANDIDATE) {
+                    py_pinyin_offset += g_utf8_strlen(candidate_string, -1);
+                }
+                if (py_pinyin_len == py_pinyin_offset) break;
+
+                pinyin_guess_sentence_with_prefix(p.instance,
+                        candidate_string);
+                pinyin_guess_full_pinyin_candidates(p.instance,
+                        py_pinyin_offset);
             } else {
                 goto NO_TRAIN;
             }
