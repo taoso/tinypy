@@ -63,10 +63,10 @@ int main()
             printf("\noperation: ");
             fgets(py_buf, X_PY_BUF_LEN, stdin);
             char operation = py_get_operation(py_buf);
-            if (operation == '+') { // page forward
+            if (operation == '+' || operation == '=' || operation == ']') {
                 if (candidate_pager_index < candidate_pager_num - 1)
                     candidate_pager_index++;
-            } else if (operation == '-') { // page backword
+            } else if (operation == '-' || operation == '[') {
                 if (candidate_pager_index > 0) candidate_pager_index--;
             } else if (isdigit(operation)) { // select a candidate
                 int _offset = (int) (operation - '0');
