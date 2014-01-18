@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
 
 struct py {
     pinyin_context_t* context;
@@ -12,9 +14,10 @@ struct py {
 void py_init(struct py * p, char *sys_data_path, char *user_data_path);
 void py_free(struct py *p);
 
-int main(int argc, char * argv[]){
+int main()
+{
     char * prefixbuf = NULL;
-    size_t prefixsize = 0;
+    //size_t prefixsize = 0;
     char * linebuf = NULL;
     size_t linesize = 0;
     ssize_t read;
@@ -23,9 +26,6 @@ int main(int argc, char * argv[]){
     py_init(&p, NULL, NULL);
 
     while(TRUE) {
-        //if ( '\n' == prefixbuf[strlen(prefixbuf) - 1] ) {
-        //    prefixbuf[strlen(prefixbuf) - 1] = '\0';
-        //}
         fprintf(stdout, "pinyin:");
         fflush(stdout);
 
@@ -40,13 +40,21 @@ int main(int argc, char * argv[]){
             break;
 
         pinyin_parse_more_full_pinyins(p.instance, linebuf);
-        //pinyin_guess_sentence_with_prefix(instance, prefixbuf);
+        pinyin_guess_sentence_with_prefix(p.instance, "");
         pinyin_guess_full_pinyin_candidates(p.instance, 0);
 
+        guint pinyin_len = 0;
+        pinyin_get_n_pinyin(p.instance, &pinyin_len);
+        printf("pinyin length: %u\n", pinyin_len);
+
+
+#ifndef GROUP_LEN
+#define GROUP_LEN 5
+#endif
+        guint group_len = GROUP_LEN;
+        const char *words[GROUP_LEN];
+        lookup_candidate_t *candidates[GROUP_LEN];
         guint len = 0;
-        guint group_len = 5;
-        const char *words[5];
-        guint word_index = 0;
         pinyin_get_n_candidate(p.instance, &len);
         if (len == 0) continue;
         guint group_num = len / group_len + ((len % group_len > 0) ? 1 : 0);
@@ -54,17 +62,38 @@ int main(int argc, char * argv[]){
         guint i = 0;
         // operation
         char c;
+#define MAX_SELECT_WORDS_NUM 256
+        char *selected_words[MAX_SELECT_WORDS_NUM];
+        int current_selected_word_index = 0;
+        int hehe = 0;
         do {
             for (guint j = 0; j < group_len; j++) {
                 guint index = i * group_len + j;
                 if (index >= len) break;
                 lookup_candidate_t * candidate = NULL;
                 pinyin_get_candidate(p.instance, i * group_len + j, &candidate);
+                candidates[j] = candidate;
+
                 const char * word = NULL;
                 pinyin_get_candidate_string(p.instance, candidate, &word);
                 words[j] = word;
                 printf("%u: %s\t", (int)j, word);
             }
+
+            printf("\n");
+            for (guint j = 0; j < group_len; j++) {
+                const char *type_name[] = {
+                    "BEST_MATCH",
+                    "NORMAL",
+                    "DIVIDED",
+                    "RESPLIT",
+                    "ZOMBIE",
+                };
+                lookup_candidate_type_t type;
+                pinyin_get_candidate_type(p.instance, candidates[j], &type);
+                printf("%u: %s\t", (int)j, type_name[type]);
+            }
+
             printf("\noperation(+/- or digit): ");
             c = getchar();
             // strip the enter key
@@ -74,13 +103,44 @@ int main(int argc, char * argv[]){
             } else if (c == '-' && i > 0) {
                 --i;
             } else if (isdigit(c)) {
-                printf("select: %s\n", words[(int)(c - '0')]);
+                const char * _word = words[c - '0'];
+                printf("select: %s\n", _word);
+                int _word_len = strlen(_word);
+                selected_words[current_selected_word_index] = (char *)malloc(_word_len + 1); 
+                if (selected_words[current_selected_word_index] == NULL) {
+                    perror("cannot alloc memory for selected word!");
+                    return 1;
+                }
+                strcpy(selected_words[current_selected_word_index], _word);
+                current_selected_word_index++;
+                hehe = pinyin_choose_candidate(p.instance, hehe, candidates[(int)(c - '0')]);
+                printf("hehe: %d\n", hehe);
+                lookup_candidate_type_t type;
+                pinyin_get_candidate_type(p.instance, candidates[(int)(c - '0')], &type);
+
+                if (type == 0) {
+                }
+
+                if (hehe >= (int)pinyin_len) {
+                    printf("all select: ");
+                    for (int i = 0; i < current_selected_word_index; i++) {
+                        printf("%s", selected_words[i]);
+                        free(selected_words[i]);
+                    }
+                    printf("\n");
+                    current_selected_word_index = 0;
+                    break;
+                };
+                pinyin_guess_sentence_with_prefix(p.instance, _word);
+                pinyin_guess_full_pinyin_candidates(p.instance, hehe);
+            } else if (c == ' ') {
+                printf("select: %s\n", words[0]);
             }
         } while (isdigit(c) || c == '+' || c == '-');
 
-        pinyin_train(p.instance);
+        //pinyin_train(p.instance);
         pinyin_reset(p.instance);
-        pinyin_save(p.context);
+        //pinyin_save(p.context);
     }
 
     py_free(&p);
