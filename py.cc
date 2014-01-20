@@ -5,9 +5,21 @@
 
 #include "py.h"
 
-int main()
+int main(int argc, char *argv[])
 {
-    char py_buf[X_PY_BUF_LEN];
+    //char py_buf[X_PY_BUF_LEN];
+    char *py_buf;
+
+    struct py_selected_word_node selected_word_list;
+    selected_word_list.word = NULL;
+    selected_word_list.next = NULL;
+    struct py_selected_word_node * current_selected_word_node = &selected_word_list;
+
+    if (argc != 2 || strlen(argv[1]) == 0) {
+        perror("Usage: py pinyin");
+        return -1;
+    }
+    py_buf = argv[1];
 
     // init libpinyin
     struct py p;
@@ -19,97 +31,96 @@ int main()
     }
     const char * candidate_string = NULL;
     lookup_candidate_type_t candidate_type;
-    const char *candidate_type_name[] = {
-        "BEST_MATCH",
-        "NORMAL",
-        "DIVIDED",
-        "RESPLIT",
-        "ZOMBIE",
-    };
 
     py_init(&p, sys_data_path, usr_data_path);
 
     // read input pinyin and instruction
-    while (true) {
-        printf("pinyin: ");
+    py_clean_pinyin(py_buf);
+
+    pinyin_parse_more_full_pinyins(p.instance, py_buf);
+    pinyin_guess_sentence_with_prefix(p.instance, "");
+    pinyin_guess_full_pinyin_candidates(p.instance, 0);
+
+    // get pinyin token length
+    unsigned int py_pinyin_len = 0;
+    unsigned int py_pinyin_offset = 0;
+
+    int candidate_pager_index = 0;
+    int candidate_pager_num = 0;
+    py_get_candidates_pager_num(&p, &candidate_pager_num);
+    do {
+        // display first page of candidates
+        py_get_candidates_by_pager(&p, candidate_pager_index, candidates);
+        for (int i = 0; i < PY_CANDIDATE_PAGER_LEN; i++) {
+            if (candidates[i] == NULL) break;
+            pinyin_get_candidate_string(p.instance,
+                    candidates[i], &candidate_string);
+            printf("%d: %s\t", i, candidate_string);
+        }
+        // read user selection
         fgets(py_buf, X_PY_BUF_LEN, stdin);
-        py_clean_pinyin(py_buf);
-        if (strcmp(py_buf, "bye") == 0) break;
-        printf("pinyin inputed: %s\n", py_buf);
+        char operation = py_get_operation(py_buf);
+        if (operation == '+' || operation == '=' || operation == ']') {
+            if (candidate_pager_index < candidate_pager_num - 1)
+                candidate_pager_index++;
+        } else if (operation == '-' || operation == '[') {
+            if (candidate_pager_index > 0) candidate_pager_index--;
+        } else if (isdigit(operation)) { // select a candidate
+            int _offset = (int) (operation - '0');
+            if (_offset > PY_CANDIDATE_PAGER_LEN)
+                _offset = PY_CANDIDATE_PAGER_LEN - 1;
 
-        pinyin_parse_more_full_pinyins(p.instance, py_buf);
-        pinyin_guess_sentence_with_prefix(p.instance, "");
-        pinyin_guess_full_pinyin_candidates(p.instance, 0);
+            pinyin_get_candidate_string(p.instance,
+                    candidates[_offset], &candidate_string);
+            pinyin_get_candidate_type(p.instance,
+                    candidates[_offset], &candidate_type);
+            py_pinyin_offset = pinyin_choose_candidate(p.instance,
+                    py_pinyin_offset, candidates[_offset]);
 
-        // get pinyin token length
-        unsigned int py_pinyin_len = 0;
-        unsigned int py_pinyin_offset = 0;
-        pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
-        printf("pinyin length: %d\n", py_pinyin_len);
-
-        int candidate_pager_index = 0;
-        int candidate_pager_num = 0;
-        py_get_candidates_pager_num(&p, &candidate_pager_num);
-        do {
-            // display first page of candidates
-            py_get_candidates_by_pager(&p, candidate_pager_index, candidates);
-            for (int i = 0; i < PY_CANDIDATE_PAGER_LEN; i++) {
-                if (candidates[i] == NULL) break;
-                pinyin_get_candidate_string(p.instance,
-                        candidates[i], &candidate_string);
-                printf("%d: %s\t", i, candidate_string);
+            char *_word = (char *)malloc(sizeof(char) * strlen(candidate_string));
+            if (_word == NULL) {
+                perror("malloc failed for _word");
+                return -1;
             }
-            // read user selection
-            printf("\noperation: ");
-            fgets(py_buf, X_PY_BUF_LEN, stdin);
-            char operation = py_get_operation(py_buf);
-            if (operation == '+' || operation == '=' || operation == ']') {
-                if (candidate_pager_index < candidate_pager_num - 1)
-                    candidate_pager_index++;
-            } else if (operation == '-' || operation == '[') {
-                if (candidate_pager_index > 0) candidate_pager_index--;
-            } else if (isdigit(operation)) { // select a candidate
-                int _offset = (int) (operation - '0');
-                if (_offset > PY_CANDIDATE_PAGER_LEN)
-                    _offset = PY_CANDIDATE_PAGER_LEN - 1;
-
-                pinyin_get_candidate_string(p.instance,
-                        candidates[_offset], &candidate_string);
-                pinyin_get_candidate_type(p.instance,
-                        candidates[_offset], &candidate_type);
-                py_pinyin_offset = pinyin_choose_candidate(p.instance,
-                        py_pinyin_offset, candidates[_offset]);
-
-                pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
-                printf("select: %s\ttype: %s\toffset/len: %u/%u\n",
-                        candidate_string,
-                        candidate_type_name[candidate_type - 1],
-                        py_pinyin_offset,
-                        py_pinyin_len);
-
-                if (candidate_type == BEST_MATCH_CANDIDATE) {
-                    py_pinyin_offset += g_utf8_strlen(candidate_string, -1);
-                }
-                if (py_pinyin_len == py_pinyin_offset) break;
-
-                pinyin_guess_sentence_with_prefix(p.instance,
-                        candidate_string);
-                pinyin_guess_full_pinyin_candidates(p.instance,
-                        py_pinyin_offset);
-            } else {
-                goto NO_TRAIN;
+            strcpy(_word, candidate_string);
+            struct py_selected_word_node * _node = new (struct py_selected_word_node);
+            if (_node == NULL) {
+                perror("malloc failed for _node");
+                return -1;
             }
-        } while (true);
-        // training
-        pinyin_train(p.instance);
+            _node->word = _word;
+            _node->next = NULL;
+            current_selected_word_node->next = _node;
+            current_selected_word_node = current_selected_word_node->next;
+
+            pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
+
+            if (candidate_type == BEST_MATCH_CANDIDATE) {
+                py_pinyin_offset += g_utf8_strlen(candidate_string, -1);
+            }
+            if (py_pinyin_len == py_pinyin_offset) break;
+
+            pinyin_guess_sentence_with_prefix(p.instance, candidate_string);
+            pinyin_guess_full_pinyin_candidates(p.instance, py_pinyin_offset);
+        } else {
+            goto NO_TRAIN;
+        }
+    } while (true);
+    // training
+    pinyin_train(p.instance);
 NO_TRAIN:
-        pinyin_reset(p.instance);
-        pinyin_save(p.context);
-    }
+    pinyin_reset(p.instance);
+    pinyin_save(p.context);
 
     // clear libpinyin
     py_free(&p);
-    printf("bye\n");
+
+    current_selected_word_node = &selected_word_list;
+    while (current_selected_word_node->next != NULL) {
+        current_selected_word_node = current_selected_word_node->next;
+        printf("%s ", current_selected_word_node->word);
+    }
+    printf("\n");
 
     return 0;
 }

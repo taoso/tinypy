@@ -8,6 +8,11 @@ struct py {
     pinyin_instance_t* instance;
 };
 
+struct py_selected_word_node {
+    const char * word;
+    struct py_selected_word_node * next;
+};
+
 void py_clean_pinyin(char * pinyin);
 char py_get_operation(char * input);
 
