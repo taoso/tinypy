@@ -23,14 +23,13 @@ int main(int argc, char *argv[])
 
     // init libpinyin
     struct py p;
-    const char * sys_data_path = " /usr/lib/libpinyin/data";
+    const char * sys_data_path = " /opt/libpinyin/lib/libpinyin/data";
     const char * usr_data_path = "./data";
     lookup_candidate_t *candidates[PY_CANDIDATE_PAGER_LEN];
     for (int i = 0; i < PY_CANDIDATE_PAGER_LEN; i++) {
         candidates[i] = NULL;
     }
     const char * candidate_string = NULL;
-    lookup_candidate_type_t candidate_type;
 
     py_init(&p, sys_data_path, usr_data_path);
 
@@ -72,8 +71,6 @@ int main(int argc, char *argv[])
 
             pinyin_get_candidate_string(p.instance,
                     candidates[_offset], &candidate_string);
-            pinyin_get_candidate_type(p.instance,
-                    candidates[_offset], &candidate_type);
             py_pinyin_offset = pinyin_choose_candidate(p.instance,
                     py_pinyin_offset, candidates[_offset]);
 
@@ -95,9 +92,6 @@ int main(int argc, char *argv[])
 
             pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
 
-            if (candidate_type == BEST_MATCH_CANDIDATE) {
-                py_pinyin_offset += g_utf8_strlen(candidate_string, -1);
-            }
             if (py_pinyin_len == py_pinyin_offset) break;
 
             pinyin_guess_sentence_with_prefix(p.instance, candidate_string);
