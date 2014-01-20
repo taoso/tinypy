@@ -48,6 +48,9 @@ int main(int argc, char *argv[])
     int candidate_pager_num = 0;
     py_get_candidates_pager_num(&p, &candidate_pager_num);
     do {
+        unsigned int candidate_len = 0;
+        pinyin_get_n_candidate(p.instance, &candidate_len);
+        if (candidate_len == 0) break;
         // display first page of candidates
         py_get_candidates_by_pager(&p, candidate_pager_index, candidates);
         for (int i = 0; i < PY_CANDIDATE_PAGER_LEN; i++) {
