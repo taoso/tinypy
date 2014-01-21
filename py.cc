@@ -50,6 +50,7 @@ int main(int argc, char *argv[])
     do {
         unsigned int candidate_len = 0;
         pinyin_get_n_candidate(p.instance, &candidate_len);
+        // for invalid pinyin
         if (candidate_len == 0) break;
         // display first page of candidates
         py_get_candidates_by_pager(&p, candidate_pager_index, candidates);
@@ -76,7 +77,6 @@ int main(int argc, char *argv[])
                     candidates[_offset], &candidate_string);
             py_pinyin_offset = pinyin_choose_candidate(p.instance,
                     py_pinyin_offset, candidates[_offset]);
-
             char *_word = (char *)malloc(sizeof(char) * strlen(candidate_string));
             if (_word == NULL) {
                 perror("malloc failed for _word");
@@ -91,21 +91,19 @@ int main(int argc, char *argv[])
             _node->word = _word;
             _node->next = NULL;
             current_selected_word_node->next = _node;
+
             current_selected_word_node = current_selected_word_node->next;
-
-            pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
-
-            if (py_pinyin_len == py_pinyin_offset) break;
-
             pinyin_guess_sentence_with_prefix(p.instance, candidate_string);
             pinyin_guess_full_pinyin_candidates(p.instance, py_pinyin_offset);
-        } else {
-            goto NO_TRAIN;
-        }
+
+            pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
+            if (py_pinyin_len == py_pinyin_offset) {
+                pinyin_train(p.instance);
+                break;
+            }
+        } else break;
     } while (true);
     // training
-    pinyin_train(p.instance);
-NO_TRAIN:
     pinyin_reset(p.instance);
     pinyin_save(p.context);
 
