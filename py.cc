@@ -97,6 +97,7 @@ int main(int argc, char *argv[])
             pinyin_guess_full_pinyin_candidates(p.instance, py_pinyin_offset);
 
             pinyin_get_n_pinyin(p.instance, &py_pinyin_len);
+            candidate_pager_index = 0;
             if (py_pinyin_len == py_pinyin_offset) {
                 pinyin_train(p.instance);
                 break;
