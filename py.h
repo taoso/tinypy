@@ -3,6 +3,9 @@
 #define X_PY_BUF_LEN 256
 #define PY_CANDIDATE_PAGER_LEN 5
 
+#define SYS_DATA_PATH "/opt/libpinyin/lib/libpinyin/data";
+#define USR_DATA_PATH "./data";
+
 struct py {
     pinyin_context_t* context;
     pinyin_instance_t* instance;

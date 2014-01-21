@@ -23,8 +23,8 @@ int main(int argc, char *argv[])
 
     // init libpinyin
     struct py p;
-    const char * sys_data_path = " /opt/libpinyin/lib/libpinyin/data";
-    const char * usr_data_path = "./data";
+    const char * sys_data_path = SYS_DATA_PATH;
+    const char * usr_data_path = USR_DATA_PATH;
     lookup_candidate_t *candidates[PY_CANDIDATE_PAGER_LEN];
     for (int i = 0; i < PY_CANDIDATE_PAGER_LEN; i++) {
         candidates[i] = NULL;
